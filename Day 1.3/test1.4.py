@@ -1,0 +1,5 @@
+f = open("test.txt", "r")
+dong = f.readlines()
+print(dong)
+print(len(dong))
+f.close()
