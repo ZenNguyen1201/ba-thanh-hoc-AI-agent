@@ -1,2 +1,6 @@
 .venv/
 .DS_Store
+.env
+tempCodeRunnerFile.py
+__pycache__/
+log_api.jsonl
