@@ -7,29 +7,32 @@ from pydantic import BaseModel, Field, ValidationError
 load_dotenv(find_dotenv())
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 MODEL = "claude-sonnet-5-5"
+
 PRICE_IN = 2.00
 PRICE_OUT = 10.00
 total_cost = 0.00
 
 def get_text(msg) -> str:
-    """Join all text blocks and skip thinking blocks."""
+    """Join all text blocks and skip thinking blocks"""
     return "".join(block.text for block in msg.content if block.type == "text")
 
-def log_usage(msg):
-    global total_cost #chay bien ngoai ma khong anh huong
-    cost = calc_cost(msg.usage)
-    print(f"[usage] input={msg.usage.input_tokens} output={msg.usage.output_tokens} cost: ${cost: .6f}")
 
 def calc_cost(usage) -> float:
-    '''Tinh chi phi (USD) tu so token in va out moi lan goi'''
+    '''Tinh gia tien cho moi lan goi API in and out'''
     cost_in = usage.input_tokens / 1_000_000 * PRICE_IN
-    cost_out = usage.input_tokens / 1_000_000 * PRICE_OUT
+    cost_out = usage.output_tokens / 1_000_000 * PRICE_OUT
     return cost_in + cost_out
+
+
+def log_usage(msg):
+    global total_cost
+    cost = calc_cost(msg.usage)
+    print(f"[usage] input={msg.usage.input_tokens} output={msg.usage.output_tokens} cost: ${cost: .6f}")
 
 def basic_call(prompt: str) -> str:
     msg = client.messages.create(
         model=MODEL,
-        max_tokens = 2000,
+        max_tokens=2000,
         messages=[{"role": "user", "content": prompt}],
     )
     log_usage(msg)
@@ -49,25 +52,36 @@ def structured_call(text: str) -> Review | None:
             "sentiment (positive, negative and neutral), "
             "score (integer from 1 to 10), "
             "summary (one short sentence). "
-            "No markdown, no extra text. "
-
+            "No markdown, no extra text . "
         ),
-        messages = [{"role": "user", "content": text}],
+        messages=[{"role": "user", "content": text}]
     )
     log_usage(msg)
+
     raw = get_text(msg).strip()
     raw = raw.removeprefix("```json").removesuffix("```").strip()
 
-if __name__ == "__main__":
+
+    try:
+        return Review.model_validate_json(raw)
+    
+    except ValidationError as e:
+        print("JSON khong the hien thi.", e)
+        return None
+
+if __name__ == "__main":
     try:
         print("--- Basic Call ---")
         print(basic_call("Xin chao, hay gioi thieu doi chut ve ban"))
-        review = structured_call("View dep nhung phuc vu hoi cham va cafe hoi nhat")
 
-        if Review:
+        review = structured_call("View dep nhung phuc vu hoi cham va cafe hoi nhat.")
+
+        if Review :
             print("Sentiment:", review.sentiment)
             print("Score:", review.score)
-        print(f"\nTong chi phi call la cost:${total_cost: .6f}")
+        print(f"\nTong chi phi khi goi API cost: ${total_cost: .6f}")
+    
     except Exception as e:
-        print("Loi:",type(e).__name__)
+        print("Loi:", type(e).__name__)
         print(e)
+
